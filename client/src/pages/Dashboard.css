@@ -1,0 +1,70 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.card h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  text-transform: capitalize;
+}
+
+.card p {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.card-em_cotacao {
+  border-top: 4px solid #0ea5e9;
+}
+
+.card-em_analise {
+  border-top: 4px solid #f59e0b;
+}
+
+.card-negada {
+  border-top: 4px solid #ef4444;
+}
+
+.card-autorizado {
+  border-top: 4px solid #22c55e;
+}
+
+.recent table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.recent th,
+.recent td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.recent tr:last-child td {
+  border-bottom: none;
+}
+
+.recent .empty {
+  text-align: center;
+  color: #94a3b8;
+}
