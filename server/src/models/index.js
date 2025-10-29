@@ -8,8 +8,13 @@ import QuotationServiceType from './QuotationServiceType.js';
 import QuotationStatusHistory from './QuotationStatusHistory.js';
 import AuditLog from './AuditLog.js';
 
-Service.hasMany(ServiceType, { foreignKey: { allowNull: false }, onDelete: 'CASCADE' });
-ServiceType.belongsTo(Service);
+Service.hasMany(ServiceType, {
+  foreignKey: { name: 'serviceId', field: 'service_id', allowNull: false },
+  onDelete: 'CASCADE',
+});
+ServiceType.belongsTo(Service, {
+  foreignKey: { name: 'serviceId', field: 'service_id', allowNull: false },
+});
 
 Quotation.belongsToMany(Supplier, { through: QuotationSupplier });
 Supplier.belongsToMany(Quotation, { through: QuotationSupplier });

@@ -142,6 +142,13 @@ export default function Suppliers() {
     reset({ name: '', document: '', address: '', phone: '', email: '' });
   }
 
+  function confirmDelete(id) {
+    const shouldDelete = window.confirm('Deseja realmente excluir este fornecedor?');
+    if (shouldDelete) {
+      deleteMutation.mutate(id);
+    }
+  }
+
   return (
     <div className="suppliers">
       <section className="form-section">
@@ -288,7 +295,7 @@ export default function Suppliers() {
                     <button
                       type="button"
                       className="danger"
-                      onClick={() => deleteMutation.mutate(supplier.id)}
+                      onClick={() => confirmDelete(supplier.id)}
                     >
                       Excluir
                     </button>

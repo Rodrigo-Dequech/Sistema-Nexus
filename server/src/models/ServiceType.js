@@ -19,6 +19,11 @@ ServiceType.init(
       allowNull: false,
       field: 'average_value',
     },
+    serviceId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: 'service_id',
+    },
   },
   {
     sequelize,

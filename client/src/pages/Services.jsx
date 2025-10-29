@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useApi } from '../services/api.js';
 import './Services.css';
@@ -18,8 +18,13 @@ export default function Services() {
   const [selectedService, setSelectedService] = useState(null);
   const [error, setError] = useState('');
 
+  const serviceOptions = useMemo(
+    () => services.map((service) => ({ id: service.id, name: service.name })),
+    [services]
+  );
+
   const serviceForm = useForm({ defaultValues: { name: '' } });
-  const typeForm = useForm({ defaultValues: { id: '', name: '', averageValue: '' } });
+  const typeForm = useForm({ defaultValues: { id: '', name: '', averageValue: '', serviceId: '' } });
 
   const serviceMutation = useMutation({
     mutationFn: async (payload) => {
@@ -41,37 +46,49 @@ export default function Services() {
   });
 
   const typeMutation = useMutation({
-    mutationFn: async (payload) => {
-      if (!payload.serviceId) throw new Error('Selecione um serviço.');
-      if (payload.serviceTypeId) {
-        return api.put(`/services/types/${payload.serviceTypeId}`, payload.body);
+    mutationFn: async ({ serviceId, serviceTypeId, body }) => {
+      if (!serviceId) {
+        throw new Error('Selecione um servico.');
       }
-      return api.post(`/services/${payload.serviceId}/types`, payload.body);
+      if (serviceTypeId) {
+        return api.put(`/services/types/${serviceTypeId}`, body);
+      }
+      return api.post(`/services/${serviceId}/types`, body);
     },
     onMutate: () => setError(''),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
-      typeForm.reset({ id: '', name: '', averageValue: '' });
+      const nextServiceId = variables?.serviceId ?? '';
+      typeForm.reset({ id: '', name: '', averageValue: '', serviceId: nextServiceId });
       setEditingType(null);
       setError('');
     },
     onError: (err) => {
-      setError(err.response?.data?.message || 'Erro ao salvar tipo de serviço.');
+      setError(err.response?.data?.message || 'Erro ao salvar tipo de servico.');
     },
   });
+
+  const selectedTypeServiceId = typeForm.watch('serviceId');
+  const selectedTypeServiceName =
+    serviceOptions.find((option) => option.id === selectedTypeServiceId)?.name || 'nenhum selecionado';
 
   function submitService(data) {
     serviceMutation.mutate(data);
   }
 
   function submitType(data) {
-    if (!selectedService) {
-      setError('Selecione um serviço na lista para adicionar tipos.');
+    if (!data.serviceId) {
+      setError('Selecione um servico para vincular o tipo.');
+      return;
+    }
+    const averageValueNumber = Number(data.averageValue);
+    if (Number.isNaN(averageValueNumber)) {
+      setError('Informe um valor numerico.');
       return;
     }
     typeMutation.mutate({
-      serviceId: selectedService.id,
-      body: { name: data.name, averageValue: data.averageValue },
+      serviceId: data.serviceId,
+      body: { name: data.name, averageValue: averageValueNumber },
       serviceTypeId: data.id,
     });
   }
@@ -91,12 +108,18 @@ export default function Services() {
   function startEditType(service, type) {
     setSelectedService(service);
     setEditingType(type);
-    typeForm.reset({ id: type.id, name: type.name, averageValue: type.averageValue });
+    typeForm.reset({
+      id: type.id,
+      name: type.name,
+      averageValue: type.averageValue,
+      serviceId: service.id,
+    });
   }
 
   function cancelTypeEdit() {
     setEditingType(null);
-    typeForm.reset({ id: '', name: '', averageValue: '' });
+    const currentServiceId = typeForm.getValues('serviceId');
+    typeForm.reset({ id: '', name: '', averageValue: '', serviceId: currentServiceId || '' });
   }
 
   const deleteServiceMutation = useMutation({
@@ -121,7 +144,8 @@ export default function Services() {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       if (editingType?.id === id) {
         setEditingType(null);
-        typeForm.reset({ id: '', name: '', averageValue: '' });
+        const currentServiceId = typeForm.getValues('serviceId');
+        typeForm.reset({ id: '', name: '', averageValue: '', serviceId: currentServiceId || '' });
       }
     },
     onError: (err) => {
@@ -171,11 +195,19 @@ export default function Services() {
                     <button type="button" onClick={() => startEditService(service)}>
                       Editar serviço
                     </button>
-                    <button type="button" onClick={() => {
-                      setSelectedService(service);
-                      setEditingType(null);
-                      typeForm.reset({ id: '', name: '', averageValue: '' });
-                    }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedService(service);
+                        setEditingType(null);
+                        typeForm.reset({
+                          id: '',
+                          name: '',
+                          averageValue: '',
+                          serviceId: service.id,
+                        });
+                      }}
+                    >
                       Adicionar tipo
                     </button>
                     <button
@@ -217,12 +249,28 @@ export default function Services() {
       </section>
       <section className="type-form">
         <h2>{editingType ? 'Editar tipo de serviço' : 'Adicionar tipo de serviço'}</h2>
-        <p className="helper-text">
-          Serviço selecionado:{' '}
-          <strong>{selectedService ? selectedService.name : 'nenhum selecionado'}</strong>
-        </p>
         <form onSubmit={typeForm.handleSubmit(submitType)}>
           <input type="hidden" {...typeForm.register('id')} />
+          <label>
+            Serviço
+            <select
+              {...typeForm.register('serviceId', { required: 'Selecione um serviço.' })}
+              disabled={Boolean(editingType)}
+            >
+              <option value="">Selecione um serviço</option>
+              {serviceOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+            {typeForm.formState.errors.serviceId && (
+              <span className="field-error">{typeForm.formState.errors.serviceId.message}</span>
+            )}
+          </label>
+          <p className="helper-text">
+            Serviço selecionado: <strong>{selectedTypeServiceName}</strong>
+          </p>
           <label>
             Nome do tipo
             <input {...typeForm.register('name', { required: 'Informe o nome.' })} />
