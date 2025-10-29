@@ -1,8 +1,55 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { useApi } from '../services/api.js';
 import './Suppliers.css';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function stripDigits(value = '') {
+  return value.replace(/\D/g, '');
+}
+
+function formatCpfCnpj(raw = '') {
+  const digits = stripDigits(raw).slice(0, 14);
+  if (!digits) {
+    return '';
+  }
+
+  if (digits.length <= 11) {
+    return digits
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  }
+
+  return digits
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\/\d{4})(\d)/, '$1-$2');
+}
+
+function formatPhone(raw = '') {
+  const digits = stripDigits(raw).slice(0, 11);
+  if (!digits) {
+    return '';
+  }
+
+  if (digits.length <= 2) {
+    return `(${digits}${digits.length === 2 ? ')' : ''}`;
+  }
+
+  if (digits.length <= 6) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  }
+
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
 
 export default function Suppliers() {
   const api = useApi();
@@ -19,6 +66,7 @@ export default function Suppliers() {
   const [error, setError] = useState('');
 
   const {
+    control,
     register,
     handleSubmit,
     reset,
@@ -63,18 +111,30 @@ export default function Suppliers() {
       }
     },
     onError: (err) => {
-      setError(err.response?.data?.message || 'Não foi possível remover o fornecedor.');
+      setError(err.response?.data?.message || 'Nao foi possivel remover o fornecedor.');
     },
   });
 
   const sortedSuppliers = useMemo(
-    () => suppliers.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    () =>
+      suppliers
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((supplier) => ({
+          ...supplier,
+          documentFormatted: formatCpfCnpj(supplier.document),
+          phoneFormatted: formatPhone(supplier.phone),
+        })),
     [suppliers]
   );
 
   function startEdit(supplier) {
     setEditing(supplier);
-    reset(supplier);
+    reset({
+      ...supplier,
+      document: formatCpfCnpj(supplier.document),
+      phone: formatPhone(supplier.phone),
+    });
   }
 
   function cancelEdit() {
@@ -86,31 +146,103 @@ export default function Suppliers() {
     <div className="suppliers">
       <section className="form-section">
         <h2>{editing ? 'Editar fornecedor' : 'Cadastrar fornecedor'}</h2>
-        <form onSubmit={handleSubmit((data) => mutation.mutate(data))}>
+        <form
+          onSubmit={handleSubmit((data) =>
+            mutation.mutate({
+              ...data,
+              document: stripDigits(data.document),
+              phone: stripDigits(data.phone),
+              email: data.email.trim(),
+            })
+          )}
+        >
           <div className="fields">
             <label>
-              Nome / Razão social
+              Nome / Razao social
               <input {...register('name', { required: 'Informe o nome.' })} />
               {errors.name && <span className="field-error">{errors.name.message}</span>}
             </label>
             <label>
               CPF / CNPJ
-              <input {...register('document', { required: 'Informe o documento.' })} />
+              <Controller
+                name="document"
+                control={control}
+                rules={{
+                  required: 'Informe o documento.',
+                  validate: (value) => {
+                    const digits = stripDigits(value);
+                    if (digits.length === 11 || digits.length === 14) {
+                      return true;
+                    }
+                    return 'Informe um CPF ou CNPJ valido.';
+                  },
+                }}
+                render={({ field }) => {
+                  const { onChange, value, ...rest } = field;
+                  return (
+                    <input
+                      {...rest}
+                      value={value ?? ''}
+                      inputMode="numeric"
+                      onChange={(event) => {
+                        const formatted = formatCpfCnpj(event.target.value);
+                        onChange(formatted);
+                      }}
+                    />
+                  );
+                }}
+              />
               {errors.document && <span className="field-error">{errors.document.message}</span>}
             </label>
             <label>
-              Endereço
-              <input {...register('address', { required: 'Informe o endereço.' })} />
+              Endereco
+              <input {...register('address', { required: 'Informe o endereco.' })} />
               {errors.address && <span className="field-error">{errors.address.message}</span>}
             </label>
             <label>
               Telefone
-              <input {...register('phone', { required: 'Informe o telefone.' })} />
+              <Controller
+                name="phone"
+                control={control}
+                rules={{
+                  required: 'Informe o telefone.',
+                  validate: (value) => {
+                    const digits = stripDigits(value);
+                    if (digits.length === 10 || digits.length === 11) {
+                      return true;
+                    }
+                    return 'Informe um telefone valido com DDD.';
+                  },
+                }}
+                render={({ field }) => {
+                  const { onChange, value, ...rest } = field;
+                  return (
+                    <input
+                      {...rest}
+                      value={value ?? ''}
+                      inputMode="numeric"
+                      onChange={(event) => {
+                        const formatted = formatPhone(event.target.value);
+                        onChange(formatted);
+                      }}
+                    />
+                  );
+                }}
+              />
               {errors.phone && <span className="field-error">{errors.phone.message}</span>}
             </label>
             <label>
               E-mail
-              <input type="email" {...register('email', { required: 'Informe o e-mail.' })} />
+              <input
+                type="email"
+                {...register('email', {
+                  required: 'Informe o e-mail.',
+                  pattern: {
+                    value: EMAIL_PATTERN,
+                    message: 'Informe um e-mail valido.',
+                  },
+                })}
+              />
               {errors.email && <span className="field-error">{errors.email.message}</span>}
             </label>
           </div>
@@ -146,8 +278,8 @@ export default function Suppliers() {
               {sortedSuppliers.map((supplier) => (
                 <tr key={supplier.id}>
                   <td>{supplier.name}</td>
-                  <td>{supplier.document}</td>
-                  <td>{supplier.phone}</td>
+                  <td>{supplier.documentFormatted}</td>
+                  <td>{supplier.phoneFormatted}</td>
                   <td>{supplier.email}</td>
                   <td className="actions-cell">
                     <button type="button" onClick={() => startEdit(supplier)}>
