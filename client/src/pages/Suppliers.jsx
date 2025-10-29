@@ -64,6 +64,8 @@ export default function Suppliers() {
 
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState('');
+  const [searchApplied, setSearchApplied] = useState(false);
+  const [searchFilters, setSearchFilters] = useState(null);
 
   const {
     control,
@@ -79,6 +81,10 @@ export default function Suppliers() {
       phone: '',
       email: '',
     },
+  });
+
+  const searchForm = useForm({
+    defaultValues: { name: '', document: '' },
   });
 
   const mutation = useMutation({
@@ -115,25 +121,48 @@ export default function Suppliers() {
     },
   });
 
-  const sortedSuppliers = useMemo(
+  const preparedSuppliers = useMemo(
     () =>
       suppliers
         .slice()
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((supplier) => ({
           ...supplier,
-          documentFormatted: formatCpfCnpj(supplier.document),
-          phoneFormatted: formatPhone(supplier.phone),
+          documentFormatted: formatCpfCnpj(supplier.document ?? ''),
+          phoneFormatted: formatPhone(supplier.phone ?? ''),
         })),
     [suppliers]
   );
+
+  const filteredSuppliers = useMemo(() => {
+    if (!searchApplied) {
+      return [];
+    }
+    if (!searchFilters) {
+      return preparedSuppliers;
+    }
+
+    const nameFilter = searchFilters.name?.toLowerCase() ?? '';
+    const documentFilter = stripDigits(searchFilters.document ?? '');
+
+    return preparedSuppliers.filter((supplier) => {
+      const matchesName = nameFilter
+        ? supplier.name.toLowerCase().includes(nameFilter)
+        : true;
+      const supplierDocument = stripDigits(supplier.document ?? '');
+      const matchesDocument = documentFilter
+        ? supplierDocument.includes(documentFilter)
+        : true;
+      return matchesName && matchesDocument;
+    });
+  }, [preparedSuppliers, searchApplied, searchFilters]);
 
   function startEdit(supplier) {
     setEditing(supplier);
     reset({
       ...supplier,
-      document: formatCpfCnpj(supplier.document),
-      phone: formatPhone(supplier.phone),
+      document: formatCpfCnpj(supplier.document ?? ''),
+      phone: formatPhone(supplier.phone ?? ''),
     });
   }
 
@@ -149,20 +178,33 @@ export default function Suppliers() {
     }
   }
 
+  function handleSearch(values) {
+    const filters = {
+      name: values.name.trim(),
+      document: values.document.trim(),
+    };
+    setSearchFilters(filters);
+    setSearchApplied(true);
+  }
+
+  function handleResetSearch() {
+    searchForm.reset({ name: '', document: '' });
+    setSearchFilters({ name: '', document: '' });
+    setSearchApplied(true);
+  }
+
   return (
     <div className="suppliers">
       <section className="form-section">
         <h2>{editing ? 'Editar fornecedor' : 'Cadastrar fornecedor'}</h2>
-        <form
-          onSubmit={handleSubmit((data) =>
-            mutation.mutate({
-              ...data,
-              document: stripDigits(data.document),
-              phone: stripDigits(data.phone),
-              email: data.email.trim(),
-            })
-          )}
-        >
+        <form onSubmit={handleSubmit((data) =>
+          mutation.mutate({
+            ...data,
+            document: stripDigits(data.document),
+            phone: stripDigits(data.phone),
+            email: data.email.trim(),
+          })
+        )}>
           <div className="fields">
             <label>
               Nome / Razao social
@@ -266,12 +308,43 @@ export default function Suppliers() {
           </div>
         </form>
       </section>
-      <section className="list-section">
-        <h2>Fornecedores cadastrados</h2>
-        {isLoading ? (
+
+      <section className="search-section">
+        <div className="search-header">
+          <h2>Buscar fornecedores</h2>
+          <form className="search-bar" onSubmit={searchForm.handleSubmit(handleSearch)}>
+            <label>
+              Nome / Razao social
+              <input
+                {...searchForm.register('name')}
+                placeholder="Digite o nome ou razao social"
+              />
+            </label>
+            <label>
+              CPF / CNPJ
+              <input
+                {...searchForm.register('document')}
+                placeholder="Digite o CPF ou CNPJ"
+                inputMode="numeric"
+              />
+            </label>
+            <div className="search-actions">
+              <button type="button" className="secondary" onClick={handleResetSearch}>
+                Limpar
+              </button>
+              <button type="submit">Buscar</button>
+            </div>
+          </form>
+        </div>
+
+        {!searchApplied ? (
+          <p className="placeholder">Realize uma busca para listar os fornecedores.</p>
+        ) : isLoading ? (
           <p>Carregando...</p>
+        ) : filteredSuppliers.length === 0 ? (
+          <p className="placeholder">Nenhum fornecedor encontrado para os filtros informados.</p>
         ) : (
-          <table>
+          <table className="results-table">
             <thead>
               <tr>
                 <th>Nome</th>
@@ -282,7 +355,7 @@ export default function Suppliers() {
               </tr>
             </thead>
             <tbody>
-              {sortedSuppliers.map((supplier) => (
+              {filteredSuppliers.map((supplier) => (
                 <tr key={supplier.id}>
                   <td>{supplier.name}</td>
                   <td>{supplier.documentFormatted}</td>
@@ -302,13 +375,6 @@ export default function Suppliers() {
                   </td>
                 </tr>
               ))}
-              {sortedSuppliers.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="empty">
-                    Nenhum fornecedor cadastrado.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         )}

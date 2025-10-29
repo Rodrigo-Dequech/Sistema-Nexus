@@ -1,15 +1,18 @@
 .suppliers {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr;
+  display: flex;
+  flex-direction: column;
   gap: 2rem;
 }
 
 .form-section,
-.list-section {
+.search-section {
   background: #fff;
   border-radius: 1rem;
   padding: 2rem;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .fields {
@@ -17,9 +20,14 @@
   gap: 1rem;
 }
 
-label input,
-label select {
-  margin-top: 0.4rem;
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-weight: 500;
+}
+
+label input {
   width: 100%;
   padding: 0.65rem 0.75rem;
   border-radius: 0.75rem;
@@ -53,22 +61,54 @@ button.danger {
   background: #ef4444;
 }
 
-.form-error,
-.field-error {
+.field-error,
+.form-error {
   color: #ef4444;
   font-size: 0.9rem;
 }
 
-.list-section table {
+.search-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.search-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.search-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.placeholder {
+  color: #94a3b8;
+}
+
+.results-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.list-section th,
-.list-section td {
+.results-table th,
+.results-table td {
   text-align: left;
   padding: 0.85rem;
   border-bottom: 1px solid #e2e8f0;
+}
+
+.results-table th {
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.results-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .actions-cell {
@@ -76,13 +116,12 @@ button.danger {
   gap: 0.5rem;
 }
 
-.empty {
-  text-align: center;
-  color: #94a3b8;
-}
-
 @media (max-width: 1024px) {
-  .suppliers {
+  .search-bar {
     grid-template-columns: 1fr;
+  }
+
+  .actions-cell {
+    flex-wrap: wrap;
   }
 }

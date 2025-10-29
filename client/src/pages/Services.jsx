@@ -16,15 +16,23 @@ export default function Services() {
   });
 
   const [selectedService, setSelectedService] = useState(null);
+  const [editingType, setEditingType] = useState(null);
   const [error, setError] = useState('');
+  const [searchFilters, setSearchFilters] = useState(null);
+  const [searchApplied, setSearchApplied] = useState(false);
+
+  const serviceForm = useForm({ defaultValues: { name: '' } });
+  const typeForm = useForm({
+    defaultValues: { id: '', serviceId: '', name: '', averageValue: '' },
+  });
+  const searchForm = useForm({
+    defaultValues: { serviceName: '', typeName: '' },
+  });
 
   const serviceOptions = useMemo(
     () => services.map((service) => ({ id: service.id, name: service.name })),
     [services]
   );
-
-  const serviceForm = useForm({ defaultValues: { name: '' } });
-  const typeForm = useForm({ defaultValues: { id: '', name: '', averageValue: '', serviceId: '' } });
 
   const serviceMutation = useMutation({
     mutationFn: async (payload) => {
@@ -41,7 +49,7 @@ export default function Services() {
       setError('');
     },
     onError: (err) => {
-      setError(err.response?.data?.message || 'Erro ao salvar serviço.');
+      setError(err.response?.data?.message || 'Erro ao salvar servico.');
     },
   });
 
@@ -68,12 +76,43 @@ export default function Services() {
     },
   });
 
+  const deleteServiceMutation = useMutation({
+    mutationFn: (id) => api.delete(`/services/${id}`),
+    onMutate: () => setError(''),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      if (selectedService?.id === id) {
+        setSelectedService(null);
+        serviceForm.reset({ name: '' });
+      }
+    },
+    onError: (err) => {
+      setError(err.response?.data?.message || 'Erro ao remover servico.');
+    },
+  });
+
+  const deleteTypeMutation = useMutation({
+    mutationFn: (id) => api.delete(`/services/types/${id}`),
+    onMutate: () => setError(''),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      if (editingType?.id === id) {
+        setEditingType(null);
+        const currentServiceId = typeForm.getValues('serviceId');
+        typeForm.reset({ id: '', name: '', averageValue: '', serviceId: currentServiceId || '' });
+      }
+    },
+    onError: (err) => {
+      setError(err.response?.data?.message || 'Erro ao remover tipo.');
+    },
+  });
+
   const selectedTypeServiceId = typeForm.watch('serviceId');
   const selectedTypeServiceName =
     serviceOptions.find((option) => option.id === selectedTypeServiceId)?.name || 'nenhum selecionado';
 
   function submitService(data) {
-    serviceMutation.mutate(data);
+    serviceMutation.mutate({ name: data.name.trim() });
   }
 
   function submitType(data) {
@@ -88,12 +127,10 @@ export default function Services() {
     }
     typeMutation.mutate({
       serviceId: data.serviceId,
-      body: { name: data.name, averageValue: averageValueNumber },
+      body: { name: data.name.trim(), averageValue: averageValueNumber },
       serviceTypeId: data.id,
     });
   }
-
-  const [editingType, setEditingType] = useState(null);
 
   function startEditService(service) {
     setSelectedService(service);
@@ -122,185 +159,280 @@ export default function Services() {
     typeForm.reset({ id: '', name: '', averageValue: '', serviceId: currentServiceId || '' });
   }
 
-  const deleteServiceMutation = useMutation({
-    mutationFn: (id) => api.delete(`/services/${id}`),
-    onMutate: () => setError(''),
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      if (selectedService?.id === id) {
-        setSelectedService(null);
-        serviceForm.reset({ name: '' });
-      }
-    },
-    onError: (err) => {
-      setError(err.response?.data?.message || 'Erro ao remover serviço.');
-    },
-  });
+  function prepareNewType(service) {
+    setSelectedService(service);
+    setEditingType(null);
+    typeForm.reset({
+      id: '',
+      name: '',
+      averageValue: '',
+      serviceId: service.id,
+    });
+  }
 
-  const deleteTypeMutation = useMutation({
-    mutationFn: (id) => api.delete(`/services/types/${id}`),
-    onMutate: () => setError(''),
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      if (editingType?.id === id) {
-        setEditingType(null);
-        const currentServiceId = typeForm.getValues('serviceId');
-        typeForm.reset({ id: '', name: '', averageValue: '', serviceId: currentServiceId || '' });
-      }
-    },
-    onError: (err) => {
-      setError(err.response?.data?.message || 'Erro ao remover tipo.');
-    },
-  });
+  function handleSearch(values) {
+    const normalized = {
+      serviceName: values.serviceName.trim(),
+      typeName: values.typeName.trim(),
+    };
+    setSearchFilters(normalized);
+    setSearchApplied(true);
+  }
+
+  function handleResetSearch() {
+    searchForm.reset({ serviceName: '', typeName: '' });
+    setSearchFilters({ serviceName: '', typeName: '' });
+    setSearchApplied(true);
+  }
+
+  const filteredServices = useMemo(() => {
+    if (!searchApplied) {
+      return [];
+    }
+    if (!searchFilters) {
+      return services;
+    }
+
+    const serviceFilter = searchFilters.serviceName?.toLowerCase() ?? '';
+    const typeFilter = searchFilters.typeName?.toLowerCase() ?? '';
+
+    return services
+      .map((service) => {
+        const matchesService = serviceFilter
+          ? service.name.toLowerCase().includes(serviceFilter)
+          : true;
+
+        const matchingTypes = (service.ServiceTypes ?? []).filter((type) => {
+          if (!typeFilter) {
+            return true;
+          }
+          return type.name.toLowerCase().includes(typeFilter);
+        });
+
+        const hasMatchingType = matchingTypes.length > 0;
+
+        if (serviceFilter && !matchesService) {
+          if (typeFilter && hasMatchingType) {
+            return {
+              ...service,
+              ServiceTypes: matchingTypes,
+            };
+          }
+          return null;
+        }
+
+        if (typeFilter && !hasMatchingType) {
+          return null;
+        }
+
+        return {
+          ...service,
+          ServiceTypes: typeFilter ? matchingTypes : service.ServiceTypes,
+        };
+      })
+      .filter(Boolean);
+  }, [services, searchApplied, searchFilters]);
 
   return (
     <div className="services-page">
-      <section className="service-form">
-        <h2>{selectedService ? 'Editar serviço' : 'Cadastrar serviço'}</h2>
-        <form onSubmit={serviceForm.handleSubmit(submitService)}>
-          <label>
-            Nome
-            <input {...serviceForm.register('name', { required: 'Informe o nome.' })} />
-            {serviceForm.formState.errors.name && (
-              <span className="field-error">{serviceForm.formState.errors.name.message}</span>
-            )}
-          </label>
-          {error && <p className="form-error">{error}</p>}
-          <div className="actions">
+      <div className="form-grid">
+        <section className="service-form">
+          <h2>{selectedService ? 'Editar servico' : 'Cadastrar servico'}</h2>
+          <form onSubmit={serviceForm.handleSubmit(submitService)}>
+            <label>
+              Nome
+              <input {...serviceForm.register('name', { required: 'Informe o nome.' })} />
+              {serviceForm.formState.errors.name && (
+                <span className="field-error">{serviceForm.formState.errors.name.message}</span>
+              )}
+            </label>
             {selectedService && (
-              <button type="button" className="secondary" onClick={cancelServiceEdit}>
-                Cancelar
-              </button>
+              <p className="helper-text">Editando: <strong>{selectedService.name}</strong></p>
             )}
-            <button type="submit" disabled={serviceMutation.isPending}>
-              {serviceMutation.isPending ? 'Salvando...' : selectedService ? 'Atualizar' : 'Cadastrar'}
-            </button>
-          </div>
-        </form>
-      </section>
-      <section className="service-list">
-        <h2>Serviços e tipos cadastrados</h2>
-        {isLoading ? (
+            {error && !typeMutation.isPending && !serviceMutation.isPending && (
+              <p className="form-error">{error}</p>
+            )}
+            <div className="actions">
+              {selectedService && (
+                <button type="button" className="secondary" onClick={cancelServiceEdit}>
+                  Cancelar
+                </button>
+              )}
+              <button type="submit" disabled={serviceMutation.isPending}>
+                {serviceMutation.isPending ? 'Salvando...' : selectedService ? 'Atualizar' : 'Cadastrar'}
+              </button>
+            </div>
+          </form>
+        </section>
+        <section className="type-form">
+          <h2>{editingType ? 'Editar tipo de servico' : 'Adicionar tipo de servico'}</h2>
+          <form onSubmit={typeForm.handleSubmit(submitType)}>
+            <input type="hidden" {...typeForm.register('id')} />
+            <label>
+              Servico
+              <select
+                {...typeForm.register('serviceId', { required: 'Selecione um servico.' })}
+                disabled={Boolean(editingType)}
+              >
+                <option value="">Selecione um servico</option>
+                {serviceOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+              {typeForm.formState.errors.serviceId && (
+                <span className="field-error">{typeForm.formState.errors.serviceId.message}</span>
+              )}
+            </label>
+            <p className="helper-text">
+              Servico selecionado: <strong>{selectedTypeServiceName}</strong>
+            </p>
+            <label>
+              Nome do tipo
+              <input {...typeForm.register('name', { required: 'Informe o nome.' })} />
+              {typeForm.formState.errors.name && (
+                <span className="field-error">{typeForm.formState.errors.name.message}</span>
+              )}
+            </label>
+            <label>
+              Valor medio
+              <input
+                type="number"
+                step="0.01"
+                {...typeForm.register('averageValue', { required: 'Informe o valor.' })}
+              />
+              {typeForm.formState.errors.averageValue && (
+                <span className="field-error">{typeForm.formState.errors.averageValue.message}</span>
+              )}
+            </label>
+            {error && (
+              <p className="form-error">{error}</p>
+            )}
+            <div className="actions">
+              {editingType && (
+                <button type="button" className="secondary" onClick={cancelTypeEdit}>
+                  Cancelar
+                </button>
+              )}
+              <button type="submit" disabled={typeMutation.isPending}>
+                {typeMutation.isPending ? 'Salvando...' : editingType ? 'Atualizar' : 'Adicionar'}
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
+
+      <section className="list-section">
+        <div className="list-header">
+          <h2>Servicos cadastrados</h2>
+          <form className="search-bar" onSubmit={searchForm.handleSubmit(handleSearch)}>
+            <label>
+              Servico
+              <input
+                {...searchForm.register('serviceName')}
+                placeholder="Digite o nome do servico"
+              />
+            </label>
+            <label>
+              Tipo de servico
+              <input
+                {...searchForm.register('typeName')}
+                placeholder="Digite o nome do tipo de servico"
+              />
+            </label>
+            <div className="search-actions">
+              <button type="button" className="secondary" onClick={handleResetSearch}>
+                Limpar
+              </button>
+              <button type="submit">Buscar</button>
+            </div>
+          </form>
+        </div>
+
+        {!searchApplied ? (
+          <p className="placeholder">Realize uma busca para listar os servicos.</p>
+        ) : isLoading ? (
           <p>Carregando...</p>
+        ) : filteredServices.length === 0 ? (
+          <p className="placeholder">Nenhum servico encontrado para os filtros informados.</p>
         ) : (
-          <div className="service-items">
-            {services.map((service) => (
-              <article key={service.id} className="service-item">
-                <header>
-                  <div>
-                    <h3>{service.name}</h3>
-                    <p>{service.ServiceTypes?.length || 0} tipos cadastrados</p>
-                  </div>
-                  <div className="item-actions">
-                    <button type="button" onClick={() => startEditService(service)}>
-                      Editar serviço
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedService(service);
-                        setEditingType(null);
-                        typeForm.reset({
-                          id: '',
-                          name: '',
-                          averageValue: '',
-                          serviceId: service.id,
-                        });
-                      }}
-                    >
-                      Adicionar tipo
-                    </button>
-                    <button
-                      type="button"
-                      className="danger"
-                      onClick={() => deleteServiceMutation.mutate(service.id)}
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                </header>
-                <ul>
-                  {service.ServiceTypes?.map((type) => (
-                    <li key={type.id}>
-                      <div>
-                        <strong>{type.name}</strong>
-                        <span>Valor médio: R$ {Number(type.averageValue).toFixed(2)}</span>
-                      </div>
-                      <div className="item-actions">
-                        <button type="button" onClick={() => startEditType(service, type)}>
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className="danger"
-                          onClick={() => deleteTypeMutation.mutate(type.id)}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                  {service.ServiceTypes?.length === 0 && <li>Sem tipos cadastrados.</li>}
-                </ul>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-      <section className="type-form">
-        <h2>{editingType ? 'Editar tipo de serviço' : 'Adicionar tipo de serviço'}</h2>
-        <form onSubmit={typeForm.handleSubmit(submitType)}>
-          <input type="hidden" {...typeForm.register('id')} />
-          <label>
-            Serviço
-            <select
-              {...typeForm.register('serviceId', { required: 'Selecione um serviço.' })}
-              disabled={Boolean(editingType)}
-            >
-              <option value="">Selecione um serviço</option>
-              {serviceOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
+          <table className="results-table">
+            <thead>
+              <tr>
+                <th>Servico</th>
+                <th>Tipos de servico</th>
+                <th>Valores medios</th>
+                <th>Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredServices.map((service) => (
+                <tr key={service.id}>
+                  <td>
+                    <strong>{service.name}</strong>
+                    {service.document && (
+                      <div className="document">Documento: {service.document}</div>
+                    )}
+                  </td>
+                  <td>
+                    {service.ServiceTypes?.length ? (
+                      <ul className="type-list">
+                        {service.ServiceTypes.map((type) => (
+                          <li key={type.id}>
+                            <span>{type.name}</span>
+                            <div className="type-row-actions">
+                              <button type="button" className="edit" onClick={() => startEditType(service, type)}>
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                className="danger"
+                                onClick={() => deleteTypeMutation.mutate(type.id)}
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="placeholder">Sem tipos cadastrados.</span>
+                    )}
+                  </td>
+                  <td>
+                    {service.ServiceTypes?.length ? (
+                      <ul className="value-list">
+                        {service.ServiceTypes.map((type) => (
+                          <li key={type.id}>R$ {Number(type.averageValue).toFixed(2)}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="placeholder">--</span>
+                    )}
+                  </td>
+                  <td>
+                    <div className="row-actions">
+                      <button type="button" className="edit" onClick={() => startEditService(service)}>
+                        Editar servico
+                      </button>
+                      <button type="button" onClick={() => prepareNewType(service)}>
+                        Adicionar tipo
+                      </button>
+                      <button
+                        type="button"
+                        className="danger"
+                        onClick={() => deleteServiceMutation.mutate(service.id)}
+                      >
+                        Excluir servico
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               ))}
-            </select>
-            {typeForm.formState.errors.serviceId && (
-              <span className="field-error">{typeForm.formState.errors.serviceId.message}</span>
-            )}
-          </label>
-          <p className="helper-text">
-            Serviço selecionado: <strong>{selectedTypeServiceName}</strong>
-          </p>
-          <label>
-            Nome do tipo
-            <input {...typeForm.register('name', { required: 'Informe o nome.' })} />
-            {typeForm.formState.errors.name && (
-              <span className="field-error">{typeForm.formState.errors.name.message}</span>
-            )}
-          </label>
-          <label>
-            Valor médio
-            <input
-              type="number"
-              step="0.01"
-              {...typeForm.register('averageValue', { required: 'Informe o valor.' })}
-            />
-            {typeForm.formState.errors.averageValue && (
-              <span className="field-error">{typeForm.formState.errors.averageValue.message}</span>
-            )}
-          </label>
-          {error && <p className="form-error">{error}</p>}
-          <div className="actions">
-            {editingType && (
-              <button type="button" className="secondary" onClick={cancelTypeEdit}>
-                Cancelar
-              </button>
-            )}
-            <button type="submit" disabled={typeMutation.isPending}>
-              {typeMutation.isPending ? 'Salvando...' : editingType ? 'Atualizar' : 'Adicionar'}
-            </button>
-          </div>
-        </form>
+            </tbody>
+          </table>
+        )}
       </section>
     </div>
   );
