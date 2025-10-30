@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import Suppliers from './pages/Suppliers.jsx';
 import Services from './pages/Services.jsx';
 import Quotations from './pages/Quotations.jsx';
+import Patients from './pages/Patients.jsx';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/fornecedores" element={<Suppliers />} />
+          <Route path="/pacientes" element={<Patients />} />
           <Route path="/servicos" element={<Services />} />
           <Route path="/cotacoes" element={<Quotations />} />
         </Route>

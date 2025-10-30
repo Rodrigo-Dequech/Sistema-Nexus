@@ -19,6 +19,11 @@ ServiceType.init(
       allowNull: false,
       field: 'average_value',
     },
+    category: {
+      type: DataTypes.ENUM('professional', 'equipment', 'medication'),
+      allowNull: false,
+      defaultValue: 'professional',
+    },
     serviceId: {
       type: DataTypes.UUID,
       allowNull: false,

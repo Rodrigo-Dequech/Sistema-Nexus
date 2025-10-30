@@ -21,6 +21,16 @@ Quotation.init(
       type: DataTypes.ENUM(...STATUSES),
       defaultValue: 'em_cotacao',
     },
+    patientId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: 'patient_id',
+    },
+    authorizedSupplierId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'authorized_supplier_id',
+    },
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,

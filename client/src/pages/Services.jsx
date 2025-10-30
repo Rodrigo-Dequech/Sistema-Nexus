@@ -4,6 +4,12 @@ import { useForm } from 'react-hook-form';
 import { useApi } from '../services/api.js';
 import './Services.css';
 
+const CATEGORY_LABELS = {
+  professional: 'Atendimento Profissional / Diarias',
+  equipment: 'Equipamentos / Taxas',
+  medication: 'Medicamentos / Materiais',
+};
+
 export default function Services() {
   const api = useApi();
   const queryClient = useQueryClient();
@@ -23,7 +29,7 @@ export default function Services() {
 
   const serviceForm = useForm({ defaultValues: { name: '' } });
   const typeForm = useForm({
-    defaultValues: { id: '', serviceId: '', name: '', averageValue: '' },
+    defaultValues: { id: '', serviceId: '', name: '', averageValue: '', category: 'professional' },
   });
   const searchForm = useForm({
     defaultValues: { serviceName: '', typeName: '' },
@@ -67,7 +73,7 @@ export default function Services() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       const nextServiceId = variables?.serviceId ?? '';
-      typeForm.reset({ id: '', name: '', averageValue: '', serviceId: nextServiceId });
+      typeForm.reset({ id: '', name: '', averageValue: '', serviceId: nextServiceId, category: 'professional' });
       setEditingType(null);
       setError('');
     },
@@ -99,7 +105,13 @@ export default function Services() {
       if (editingType?.id === id) {
         setEditingType(null);
         const currentServiceId = typeForm.getValues('serviceId');
-        typeForm.reset({ id: '', name: '', averageValue: '', serviceId: currentServiceId || '' });
+        typeForm.reset({
+          id: '',
+          name: '',
+          averageValue: '',
+          serviceId: currentServiceId || '',
+          category: 'professional',
+        });
       }
     },
     onError: (err) => {
@@ -125,16 +137,17 @@ export default function Services() {
       setError('Informe um valor numerico.');
       return;
     }
+    const category = data.category || 'professional';
     typeMutation.mutate({
       serviceId: data.serviceId,
-      body: { name: data.name.trim(), averageValue: averageValueNumber },
+      body: { name: data.name.trim(), averageValue: averageValueNumber, category },
       serviceTypeId: data.id,
     });
   }
 
   function startEditService(service) {
     setSelectedService(service);
-    serviceForm.reset({ name: service.name });
+      serviceForm.reset({ name: service.name });
   }
 
   function cancelServiceEdit() {
@@ -150,24 +163,32 @@ export default function Services() {
       name: type.name,
       averageValue: type.averageValue,
       serviceId: service.id,
+      category: type.category || 'professional',
     });
   }
 
   function cancelTypeEdit() {
     setEditingType(null);
     const currentServiceId = typeForm.getValues('serviceId');
-    typeForm.reset({ id: '', name: '', averageValue: '', serviceId: currentServiceId || '' });
+    typeForm.reset({
+      id: '',
+      name: '',
+      averageValue: '',
+      serviceId: currentServiceId || '',
+      category: 'professional',
+    });
   }
 
   function prepareNewType(service) {
     setSelectedService(service);
     setEditingType(null);
-    typeForm.reset({
-      id: '',
-      name: '',
-      averageValue: '',
-      serviceId: service.id,
-    });
+                        typeForm.reset({
+                          id: '',
+                          name: '',
+                          averageValue: '',
+                          serviceId: service.id,
+                          category: 'professional',
+                        });
   }
 
   function handleSearch(values) {
@@ -296,6 +317,17 @@ export default function Services() {
               )}
             </label>
             <label>
+              Categoria
+              <select {...typeForm.register('category', { required: 'Selecione a categoria.' })}>
+                <option value="professional">{CATEGORY_LABELS.professional}</option>
+                <option value="equipment">{CATEGORY_LABELS.equipment}</option>
+                <option value="medication">{CATEGORY_LABELS.medication}</option>
+              </select>
+              {typeForm.formState.errors.category && (
+                <span className="field-error">{typeForm.formState.errors.category.message}</span>
+              )}
+            </label>
+            <label>
               Valor medio
               <input
                 type="number"
@@ -381,6 +413,9 @@ export default function Services() {
                         {service.ServiceTypes.map((type) => (
                           <li key={type.id}>
                             <span>{type.name}</span>
+                            <span className="type-category">
+                              {CATEGORY_LABELS[type.category] || CATEGORY_LABELS.professional}
+                            </span>
                             <div className="type-row-actions">
                               <button type="button" className="edit" onClick={() => startEditType(service, type)}>
                                 Editar

@@ -7,6 +7,7 @@ import QuotationSupplier from './QuotationSupplier.js';
 import QuotationServiceType from './QuotationServiceType.js';
 import QuotationStatusHistory from './QuotationStatusHistory.js';
 import AuditLog from './AuditLog.js';
+import Patient from './Patient.js';
 
 Service.hasMany(ServiceType, {
   foreignKey: { name: 'serviceId', field: 'service_id', allowNull: false },
@@ -16,11 +17,27 @@ ServiceType.belongsTo(Service, {
   foreignKey: { name: 'serviceId', field: 'service_id', allowNull: false },
 });
 
+Quotation.belongsTo(Patient, {
+  foreignKey: { name: 'patientId', field: 'patient_id', allowNull: false },
+});
+Patient.hasMany(Quotation, {
+  foreignKey: { name: 'patientId', field: 'patient_id', allowNull: false },
+});
+
 Quotation.belongsToMany(Supplier, { through: QuotationSupplier });
 Supplier.belongsToMany(Quotation, { through: QuotationSupplier });
 
 Quotation.belongsToMany(ServiceType, { through: QuotationServiceType });
 ServiceType.belongsToMany(Quotation, { through: QuotationServiceType });
+
+Quotation.belongsTo(Supplier, {
+  as: 'authorizedSupplier',
+  foreignKey: { name: 'authorizedSupplierId', field: 'authorized_supplier_id', allowNull: true },
+});
+Supplier.hasMany(Quotation, {
+  as: 'authorizedQuotations',
+  foreignKey: { name: 'authorizedSupplierId', field: 'authorized_supplier_id', allowNull: true },
+});
 
 Quotation.hasMany(QuotationStatusHistory, { foreignKey: { allowNull: false }, onDelete: 'CASCADE' });
 QuotationStatusHistory.belongsTo(Quotation);
@@ -34,6 +51,7 @@ export {
   QuotationServiceType,
   QuotationStatusHistory,
   QuotationSupplier,
+  Patient,
   Service,
   ServiceType,
   Supplier,

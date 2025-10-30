@@ -7,6 +7,7 @@ import authRoutes from './routes/authRoutes.js';
 import supplierRoutes from './routes/supplierRoutes.js';
 import serviceRoutes from './routes/serviceRoutes.js';
 import quotationRoutes from './routes/quotationRoutes.js';
+import patientRoutes from './routes/patientRoutes.js';
 
 dotenv.config();
 
@@ -24,10 +25,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/quotations', quotationRoutes);
+app.use('/api/patients', patientRoutes);
 
 export async function initDatabase() {
   await sequelize.authenticate();
-  await sequelize.sync();
+  await sequelize.sync({ alter: true });
 }
 
 export default app;

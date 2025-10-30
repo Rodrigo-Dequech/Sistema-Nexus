@@ -150,6 +150,19 @@ button.danger {
   margin-top: 0.4rem;
 }
 
+.type-category {
+  display: inline-flex;
+  margin-top: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #1f2937;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .row-actions {
   display: flex;
   flex-direction: column;

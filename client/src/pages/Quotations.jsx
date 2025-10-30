@@ -5,8 +5,8 @@ import { useApi } from '../services/api.js';
 import './Quotations.css';
 
 const STATUS_LABELS = {
-  em_cotacao: 'Em cotação',
-  em_analise: 'Em análise',
+  em_cotacao: 'Em cotacao',
+  em_analise: 'Em analise',
   negada: 'Negada',
   autorizado: 'Autorizado',
 };
@@ -39,7 +39,16 @@ export default function Quotations() {
     },
   });
 
+  const { data: patients = [] } = useQuery({
+    queryKey: ['patients'],
+    queryFn: async () => {
+      const { data } = await api.get('/patients');
+      return data;
+    },
+  });
+
   const [showModal, setShowModal] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState('');
   const [selectedSuppliers, setSelectedSuppliers] = useState([]);
   const [selectedServiceTypes, setSelectedServiceTypes] = useState([]);
   const [error, setError] = useState('');
@@ -50,12 +59,13 @@ export default function Quotations() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotations'] });
       setShowModal(false);
+      setSelectedPatient('');
       setSelectedSuppliers([]);
       setSelectedServiceTypes([]);
       setError('');
     },
     onError: (err) => {
-      setError(err.response?.data?.message || 'Erro ao criar cotação.');
+      setError(err.response?.data?.message || 'Erro ao criar cotacao.');
     },
   });
 
@@ -66,7 +76,7 @@ export default function Quotations() {
       queryClient.invalidateQueries({ queryKey: ['quotations'] });
     },
     onError: (err) => {
-      setError(err.response?.data?.message || 'Não foi possível atualizar o status.');
+      setError(err.response?.data?.message || 'Nao foi possivel atualizar o status.');
     },
   });
 
@@ -88,11 +98,16 @@ export default function Quotations() {
   }
 
   function handleCreateQuotation() {
+    if (!selectedPatient) {
+      setError('Selecione um paciente.');
+      return;
+    }
     if (selectedSuppliers.length === 0 || selectedServiceTypes.length === 0) {
-      setError('Selecione ao menos um fornecedor e um tipo de serviço.');
+      setError('Selecione ao menos um fornecedor e um tipo de servico.');
       return;
     }
     createQuotationMutation.mutate({
+      patientId: selectedPatient,
       supplierIds: selectedSuppliers,
       serviceTypeIds: selectedServiceTypes,
     });
@@ -100,6 +115,7 @@ export default function Quotations() {
 
   function closeModal() {
     setShowModal(false);
+    setSelectedPatient('');
     setSelectedSuppliers([]);
     setSelectedServiceTypes([]);
     setError('');
@@ -108,23 +124,24 @@ export default function Quotations() {
   return (
     <div className="quotations-page">
       <header className="header">
-        <h2>Cotações</h2>
+        <h2>Cotacoes</h2>
         <button type="button" onClick={() => setShowModal(true)}>
-          Nova cotação
+          Nova cotacao
         </button>
       </header>
-      {error && <p className="form-error">{error}</p>}
+      {error && !showModal && <p className="form-error">{error}</p>}
       {isLoading ? (
         <p>Carregando...</p>
       ) : (
         <table>
           <thead>
             <tr>
-              <th>Número</th>
+              <th>Numero</th>
+              <th>Paciente</th>
               <th>Status</th>
               <th>Criada em</th>
               <th>Fornecedores</th>
-              <th>Serviços</th>
+              <th>Servicos</th>
               <th></th>
             </tr>
           </thead>
@@ -132,6 +149,7 @@ export default function Quotations() {
             {quotations.map((quotation) => (
               <tr key={quotation.id}>
                 <td>{quotation.number}</td>
+                <td>{quotation.patient?.name || 'Nao informado'}</td>
                 <td>{STATUS_LABELS[quotation.status]}</td>
                 <td>{format(new Date(quotation.createdAt), 'dd/MM/yyyy HH:mm')}</td>
                 <td>{quotation.suppliers.map((supplier) => supplier.name).join(', ')}</td>
@@ -139,12 +157,13 @@ export default function Quotations() {
                 <td>
                   <select
                     value={quotation.status}
+                    disabled={quotation.status === 'autorizado'}
                     onChange={(event) =>
                       updateStatusMutation.mutate({ id: quotation.id, status: event.target.value })
                     }
                   >
                     {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
+                      <option key={value} value={value} disabled={value === 'autorizado'}>
                         {label}
                       </option>
                     ))}
@@ -154,8 +173,8 @@ export default function Quotations() {
             ))}
             {quotations.length === 0 && (
               <tr>
-                <td colSpan={6} className="empty">
-                  Nenhuma cotação registrada.
+                <td colSpan={7} className="empty">
+                  Nenhuma cotacao registrada.
                 </td>
               </tr>
             )}
@@ -167,12 +186,26 @@ export default function Quotations() {
         <div className="modal-overlay">
           <div className="modal">
             <header>
-              <h3>Selecionar fornecedores e serviços</h3>
+              <h3>Selecionar fornecedores e servicos</h3>
               <button type="button" onClick={closeModal} className="close">
                 ×
               </button>
             </header>
             <div className="modal-content">
+              <div className="modal-column">
+                <h4>Paciente</h4>
+                <select
+                  value={selectedPatient}
+                  onChange={(event) => setSelectedPatient(event.target.value)}
+                >
+                  <option value="">Selecione um paciente</option>
+                  {patients.map((patient) => (
+                    <option key={patient.id} value={patient.id}>
+                      {patient.name} {patient.cpf ? `- ${patient.cpf}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="modal-column">
                 <h4>Fornecedores</h4>
                 <ul>
@@ -203,19 +236,19 @@ export default function Quotations() {
                 </div>
               </div>
               <div className="modal-column">
-                <h4>Tipos de serviço</h4>
+                <h4>Tipos de servico</h4>
                 <ul>
                   {services.flatMap((service) =>
                     (service.ServiceTypes || []).map((type) => (
                       <li key={type.id}>
                         <button type="button" onClick={() => toggleServiceType(type.id)}>
-                          {service.name} — {type.name}
+                          {service.name} - {type.name}
                         </button>
                       </li>
                     ))
                   )}
                   {services.every((service) => !service.ServiceTypes || service.ServiceTypes.length === 0) && (
-                    <li>Nenhum tipo de serviço cadastrado.</li>
+                    <li>Nenhum tipo de servico cadastrado.</li>
                   )}
                 </ul>
                 <div className="selected">
@@ -228,7 +261,7 @@ export default function Quotations() {
                       const type = service?.ServiceTypes?.find((item) => item.id === id);
                       return (
                         <li key={id}>
-                          {service?.name} — {type?.name}
+                          {service?.name} - {type?.name}
                           <button type="button" onClick={() => toggleServiceType(id)}>
                             Remover
                           </button>
@@ -244,8 +277,12 @@ export default function Quotations() {
               <button type="button" className="secondary" onClick={closeModal}>
                 Cancelar
               </button>
-              <button type="button" onClick={handleCreateQuotation} disabled={createQuotationMutation.isPending}>
-                {createQuotationMutation.isPending ? 'Criando...' : 'Criar cotação'}
+              <button
+                type="button"
+                onClick={handleCreateQuotation}
+                disabled={createQuotationMutation.isPending}
+              >
+                {createQuotationMutation.isPending ? 'Criando...' : 'Criar cotacao'}
               </button>
             </footer>
           </div>

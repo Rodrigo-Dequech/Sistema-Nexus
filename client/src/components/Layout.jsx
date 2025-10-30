@@ -21,6 +21,9 @@ export default function Layout() {
           <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'active' : undefined)}>
             Dashboard
           </NavLink>
+          <NavLink to="/pacientes" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+            Pacientes
+          </NavLink>
           <NavLink to="/fornecedores" className={({ isActive }) => (isActive ? 'active' : undefined)}>
             Fornecedores
           </NavLink>
