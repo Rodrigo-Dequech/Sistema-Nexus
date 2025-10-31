@@ -18,10 +18,10 @@ ServiceType.belongsTo(Service, {
 });
 
 Quotation.belongsTo(Patient, {
-  foreignKey: { name: 'patientId', field: 'patient_id', allowNull: false },
+  foreignKey: { name: 'patientId', field: 'patient_id', allowNull: true },
 });
 Patient.hasMany(Quotation, {
-  foreignKey: { name: 'patientId', field: 'patient_id', allowNull: false },
+  foreignKey: { name: 'patientId', field: 'patient_id', allowNull: true },
 });
 
 Quotation.belongsToMany(Supplier, { through: QuotationSupplier });
@@ -39,8 +39,13 @@ Supplier.hasMany(Quotation, {
   foreignKey: { name: 'authorizedSupplierId', field: 'authorized_supplier_id', allowNull: true },
 });
 
-Quotation.hasMany(QuotationStatusHistory, { foreignKey: { allowNull: false }, onDelete: 'CASCADE' });
-QuotationStatusHistory.belongsTo(Quotation);
+Quotation.hasMany(QuotationStatusHistory, {
+  foreignKey: { name: 'quotationId', field: 'quotation_id', allowNull: false },
+  onDelete: 'CASCADE',
+});
+QuotationStatusHistory.belongsTo(Quotation, {
+  foreignKey: { name: 'quotationId', field: 'quotation_id', allowNull: false },
+});
 
 QuotationStatusHistory.belongsTo(User, { as: 'changedBy', foreignKey: { name: 'changed_by', allowNull: false } });
 User.hasMany(QuotationStatusHistory, { as: 'statusChanges', foreignKey: 'changed_by' });

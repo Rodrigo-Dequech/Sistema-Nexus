@@ -26,6 +26,11 @@ QuotationStatusHistory.init(
       defaultValue: DataTypes.NOW,
       field: 'changed_at',
     },
+    quotationId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: 'quotation_id',
+    },
     changed_by: {
       type: DataTypes.UUID,
       allowNull: false,

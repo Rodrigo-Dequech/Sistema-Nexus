@@ -93,6 +93,15 @@
   gap: 0.5rem;
 }
 
+.ellipsis {
+  display: inline-block;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+
 .dashboard button {
   border: none;
   border-radius: 0.75rem;

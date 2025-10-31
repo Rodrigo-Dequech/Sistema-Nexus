@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../context/AuthContext.jsx';
 import { useApi } from '../services/api.js';
+import { formatQuotationNumber } from '../utils/formatting.js';
 import './Dashboard.css';
 
 const STATUS_LABELS = {
@@ -26,6 +28,7 @@ function formatCurrency(value) {
 export default function Dashboard() {
   const api = useApi();
   const queryClient = useQueryClient();
+  const { token } = useAuth();
 
   const { data: quotations = [], isLoading } = useQuery({
     queryKey: ['quotations'],
@@ -106,12 +109,26 @@ export default function Dashboard() {
     authorizeMutation.mutate({ id: detailId, supplierId: selectedSupplier });
   }
 
-  function handleGeneratePdf() {
-    if (!detailId) {
+  async function handleGeneratePdf() {
+    if (!detailId || !authorized) {
       return;
     }
-    const url = `/api/quotations/${detailId}/budget`;
-    window.open(url, '_blank', 'noopener');
+    try {
+      const response = await api.get(`/quotations/${detailId}/budget`, {
+        responseType: 'blob',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const blob = response.data;
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 60_000);
+    } catch (err) {
+      setDetailError(err.response?.data?.message || 'Nao foi possivel gerar o PDF.');
+    }
   }
 
   const authorized = quotationDetail?.status === 'autorizado';
@@ -152,6 +169,7 @@ export default function Dashboard() {
             <thead>
               <tr>
                 <th>No Cotacao</th>
+                <th>Paciente</th>
                 <th>Status</th>
                 <th>Criada em</th>
                 <th>Fornecedores</th>
@@ -161,7 +179,12 @@ export default function Dashboard() {
             <tbody>
               {quotations.map((quotation) => (
                 <tr key={quotation.id}>
-                  <td>{quotation.number}</td>
+                  <td>{formatQuotationNumber(quotation.number)}</td>
+                  <td>
+                    <span className="ellipsis" title={quotation.patient?.name || 'Nao informado'}>
+                      {quotation.patient?.name || 'Nao informado'}
+                    </span>
+                  </td>
                   <td>
                     <span className={`status-badge status-${STATUS_COLORS[quotation.status]}`}>
                       {STATUS_LABELS[quotation.status] || quotation.status}

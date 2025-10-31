@@ -23,7 +23,7 @@ Quotation.init(
     },
     patientId: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
       field: 'patient_id',
     },
     authorizedSupplierId: {
